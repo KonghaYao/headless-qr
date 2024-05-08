@@ -20,21 +20,19 @@
 
 import { QRErrorCorrectionLevel, QRMaskPattern } from './constants.js';
 
-/** @typedef {boolean | null} Module */
+type Module = boolean | null
 
 const encoder = new TextEncoder();
 
 const PAD0 = 0xec;
 const PAD1 = 0x11;
 
+export interface QROptions { version?: number, correction?: 'L' | 'M' | 'Q' | 'H'; }
 /**
- * @param {string} input
- * @param {{
- *   version?: number;
- *   correction?: 'L' | 'M' | 'Q' | 'H';
- * }} opts
+ * @param input
+ * @param opts
  */
-export function qr(input, { version = -1, correction = 'M' } = {}) {
+export function qr(input: string, { version = -1, correction = 'M' }: QROptions = {}) {
 	const error_correction_level = QRErrorCorrectionLevel[correction];
 	const data = encoder.encode(input);
 
@@ -62,8 +60,7 @@ export function qr(input, { version = -1, correction = 'M' } = {}) {
 	}
 
 	const size = version * 4 + 17;
-	/** @type {Module[][]} */
-	const modules = new Array(size);
+	const modules: Module[][] = new Array(size);
 	for (let row = 0; row < size; row += 1) {
 		modules[row] = new Array(size);
 	}
@@ -88,10 +85,10 @@ export function qr(input, { version = -1, correction = 'M' } = {}) {
 	return make(false, best_pattern);
 
 	/**
-	 * @param {boolean} test
-	 * @param {number} mask_pattern
+	 * @param test
+	 * @param mask_pattern
 	 */
-	function make(test, mask_pattern) {
+	function make(test: boolean, mask_pattern: number) {
 		for (let row = 0; row < size; row += 1) {
 			for (let col = 0; col < size; col += 1) {
 				modules[row][col] = null;
@@ -116,11 +113,11 @@ export function qr(input, { version = -1, correction = 'M' } = {}) {
 }
 
 /**
- * @param {Module[][]} modules
- * @param {number} row
- * @param {number} col
+ * @param modules
+ * @param row
+ * @param col
  */
-function setup_position_probe_pattern(modules, row, col) {
+function setup_position_probe_pattern(modules: Module[][], row: number, col: number) {
 	for (let r = -1; r <= 7; r += 1) {
 		if (row + r <= -1 || modules.length <= row + r) continue;
 
@@ -141,10 +138,10 @@ function setup_position_probe_pattern(modules, row, col) {
 }
 
 /**
- * @param {Module[][]} modules
- * @param {number} version
+ * @param modules
+ * @param version
  */
-function setup_position_adjust_pattern(modules, version) {
+function setup_position_adjust_pattern(modules: Module[][], version: number) {
 	const pos = QRUtil.get_pattern_position(version);
 
 	for (let i = 0; i < pos.length; i += 1) {
@@ -169,10 +166,7 @@ function setup_position_adjust_pattern(modules, version) {
 	}
 }
 
-/**
- * @param {Module[][]} modules
- */
-function setup_timing_pattern(modules) {
+function setup_timing_pattern(modules: Module[][]) {
 	for (let r = 8; r < modules.length - 8; r += 1) {
 		if (modules[r][6] != null) {
 			continue;
@@ -189,12 +183,12 @@ function setup_timing_pattern(modules) {
 }
 
 /**
- * @param {Module[][]} modules
- * @param {boolean} test
- * @param {number} mask_pattern
- * @param {number} error_correction_level
+ * @param modules
+ * @param test
+ * @param mask_pattern
+ * @param error_correction_level
  */
-function setup_type_info(modules, test, mask_pattern, error_correction_level) {
+function setup_type_info(modules: Module[][], test: boolean, mask_pattern: number, error_correction_level: number) {
 	const data = (error_correction_level << 3) | mask_pattern;
 	const bits = QRUtil.get_bch_type_info(data);
 
@@ -233,7 +227,7 @@ function setup_type_info(modules, test, mask_pattern, error_correction_level) {
  * @param {number} version
  * @param {boolean} test
  */
-function setup_version_number(modules, version, test) {
+function setup_version_number(modules: Module[][], version: number, test: boolean) {
 	const bits = QRUtil.get_bch_type_number(version);
 
 	for (let i = 0; i < 18; i += 1) {
@@ -252,7 +246,7 @@ function setup_version_number(modules, version, test) {
  * @param {number[]} data
  * @param {number} mask_pattern
  */
-function map_data(modules, data, mask_pattern) {
+function map_data(modules: Module[][], data: number[], mask_pattern: number) {
 	let inc = -1;
 	let row = modules.length - 1;
 	let bit_index = 7;
@@ -301,7 +295,7 @@ function map_data(modules, data, mask_pattern) {
 /**
  * @param {Module[][]} modules
  */
-function get_lost_point(modules) {
+function get_lost_point(modules: Module[][]) {
 	const size = modules.length;
 	let lost_point = 0;
 
@@ -309,7 +303,7 @@ function get_lost_point(modules) {
 	 * @param {number} row
 	 * @param {number} col
 	 */
-	const is_dark = (row, col) => modules[row][col];
+	const is_dark = (row: number, col: number) => modules[row][col];
 
 	// LEVEL1
 	for (let row = 0; row < size; row += 1) {
@@ -411,7 +405,7 @@ function get_lost_point(modules) {
  * @param {QrBitBuffer} buffer
  * @param {Array<{ data_count: number, total_count: number }>} rs_blocks
  */
-function create_bytes(buffer, rs_blocks) {
+function create_bytes(buffer: QrBitBuffer, rs_blocks: { data_count: number, total_count: number }[]) {
 	let offset = 0;
 
 	let max_dc_count = 0;
@@ -483,7 +477,7 @@ function create_bytes(buffer, rs_blocks) {
  * @param {number} error_correction_level
  * @param {Uint8Array} data
  */
-function create_data(version, error_correction_level, data) {
+function create_data(version: number, error_correction_level: number, data: Uint8Array) {
 	const rs_blocks = QRRSBlock.get_rs_blocks(version, error_correction_level);
 
 	const buffer = new QrBitBuffer();
@@ -594,7 +588,7 @@ const QRUtil = (function () {
 	/**
 	 * @param {number} data
 	 */
-	function get_bch_digit(data) {
+	function get_bch_digit(data: number) {
 		let digit = 0;
 		while (data != 0) {
 			digit += 1;
@@ -607,7 +601,7 @@ const QRUtil = (function () {
 		/**
 		 * @param {number} data
 		 */
-		get_bch_type_info(data) {
+		get_bch_type_info(data: number) {
 			let d = data << 10;
 			while (get_bch_digit(d) - get_bch_digit(G15) >= 0) {
 				d ^= G15 << (get_bch_digit(d) - get_bch_digit(G15));
@@ -618,7 +612,7 @@ const QRUtil = (function () {
 		/**
 		 * @param {number} data
 		 */
-		get_bch_type_number(data) {
+		get_bch_type_number(data: number) {
 			let d = data << 12;
 			while (get_bch_digit(d) - get_bch_digit(G18) >= 0) {
 				d ^= G18 << (get_bch_digit(d) - get_bch_digit(G18));
@@ -629,7 +623,7 @@ const QRUtil = (function () {
 		/**
 		 * @param {number} version
 		 */
-		get_pattern_position(version) {
+		get_pattern_position(version: number) {
 			return PATTERN_POSITION_TABLE[version - 1];
 		},
 
@@ -638,38 +632,38 @@ const QRUtil = (function () {
 		 * @param {number} mask_pattern
 		 * @returns {(i: number, j: number) => boolean}
 		 */
-		get_mask_function(mask_pattern) {
+		get_mask_function(mask_pattern: number) {
 			switch (mask_pattern) {
 				case QRMaskPattern.PATTERN000:
-					return function (i, j) {
+					return function (i: any, j: any) {
 						return (i + j) % 2 == 0;
 					};
 				case QRMaskPattern.PATTERN001:
-					return function (i, j) {
+					return function (i: number, j: any) {
 						return i % 2 == 0;
 					};
 				case QRMaskPattern.PATTERN010:
-					return function (i, j) {
+					return function (i: any, j: number) {
 						return j % 3 == 0;
 					};
 				case QRMaskPattern.PATTERN011:
-					return function (i, j) {
+					return function (i: any, j: any) {
 						return (i + j) % 3 == 0;
 					};
 				case QRMaskPattern.PATTERN100:
-					return function (i, j) {
+					return function (i: number, j: number) {
 						return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 == 0;
 					};
 				case QRMaskPattern.PATTERN101:
-					return function (i, j) {
+					return function (i: number, j: number) {
 						return ((i * j) % 2) + ((i * j) % 3) == 0;
 					};
 				case QRMaskPattern.PATTERN110:
-					return function (i, j) {
+					return function (i: number, j: number) {
 						return (((i * j) % 2) + ((i * j) % 3)) % 2 == 0;
 					};
 				case QRMaskPattern.PATTERN111:
-					return function (i, j) {
+					return function (i: number, j: number) {
 						return (((i * j) % 3) + ((i + j) % 2)) % 2 == 0;
 					};
 
@@ -679,7 +673,7 @@ const QRUtil = (function () {
 		},
 
 		/** @param {number} error_correct_length */
-		get_error_correct_polynominal(error_correct_length) {
+		get_error_correct_polynominal(error_correct_length: number) {
 			let a = new QrPolynomial([1], 0);
 			for (let i = 0; i < error_correct_length; i += 1) {
 				a = a.multiply(new QrPolynomial([1, QRMath.gexp(i)], 0));
@@ -690,7 +684,7 @@ const QRUtil = (function () {
 		/**
 		 * @param {number} type
 		 */
-		get_length_in_bits(type) {
+		get_length_in_bits(type: number) {
 			if (1 <= type && type < 10) {
 				// 1 - 9
 				return 8;
@@ -725,7 +719,7 @@ const QRMath = (function () {
 
 	return {
 		/** @param {number} n */
-		glog(n) {
+		glog(n: number) {
 			if (n < 1) {
 				throw 'glog(' + n + ')';
 			}
@@ -734,7 +728,7 @@ const QRMath = (function () {
 		},
 
 		/** @param {number} n */
-		gexp(n) {
+		gexp(n: number) {
 			while (n < 0) {
 				n += 255;
 			}
@@ -755,7 +749,7 @@ class QrPolynomial {
 	 * @param {number[]} num
 	 * @param {number} shift
 	 */
-	constructor(num, shift) {
+	constructor(num: number[], shift: number) {
 		if (typeof num.length == 'undefined') {
 			throw num.length + '/' + shift;
 		}
@@ -774,7 +768,7 @@ class QrPolynomial {
 	/**
 	 * @param {number} index
 	 */
-	get_at(index) {
+	get_at(index: number) {
 		return this.#num[index];
 	}
 
@@ -785,7 +779,7 @@ class QrPolynomial {
 	/**
 	 * @param {QrPolynomial} e
 	 */
-	multiply(e) {
+	multiply(e: QrPolynomial) {
 		const num = new Array(this.get_length() + e.get_length() - 1);
 
 		for (let i = 0; i < this.get_length(); i += 1) {
@@ -803,7 +797,7 @@ class QrPolynomial {
 	 * @param {QrPolynomial} e
 	 * @returns {QrPolynomial}
 	 */
-	mod(e) {
+	mod(e: QrPolynomial): QrPolynomial {
 		if (this.get_length() - e.get_length() < 0) {
 			return this;
 		}
@@ -1076,7 +1070,7 @@ const QRRSBlock = (function () {
 	 * @param {number} version
 	 * @param {number} error_correction_level
 	 */
-	function get_rs_block_table(version, error_correction_level) {
+	function get_rs_block_table(version: number, error_correction_level: any) {
 		switch (error_correction_level) {
 			case QRErrorCorrectionLevel.L:
 				return RS_BLOCK_TABLE[(version - 1) * 4 + 0];
@@ -1096,7 +1090,7 @@ const QRRSBlock = (function () {
 		 * @param {number} version
 		 * @param {number} error_correction_level
 		 */
-		get_rs_blocks(version, error_correction_level) {
+		get_rs_blocks(version: number, error_correction_level: number) {
 			const rs_block = get_rs_block_table(version, error_correction_level);
 
 			if (typeof rs_block == 'undefined') {
@@ -1129,7 +1123,7 @@ const QRRSBlock = (function () {
 
 class QrBitBuffer {
 	/** @type {number[]} */
-	#buffer = [];
+	#buffer: number[] = [];
 	#length = 0;
 
 	get_buffer() {
@@ -1140,7 +1134,7 @@ class QrBitBuffer {
 	 * @param {number} num
 	 * @param {number} length
 	 */
-	put(num, length) {
+	put(num: number, length: number) {
 		for (let i = 0; i < length; i += 1) {
 			this.put_bit(((num >>> (length - i - 1)) & 1) == 1);
 		}
@@ -1153,7 +1147,7 @@ class QrBitBuffer {
 	/**
 	 * @param {boolean} bit
 	 */
-	put_bit(bit) {
+	put_bit(bit: boolean) {
 		const buf_index = Math.floor(this.#length / 8);
 		if (this.#buffer.length <= buf_index) {
 			this.#buffer.push(0);
@@ -1167,7 +1161,7 @@ class QrBitBuffer {
 	}
 
 	/** @param {Uint8Array} bytes */
-	put_bytes(bytes) {
+	put_bytes(bytes: Uint8Array) {
 		for (let i = 0; i < bytes.length; i += 1) {
 			this.put(bytes[i], 8);
 		}
